@@ -44,3 +44,21 @@ export async function pushToGist(token, gistId, data) {
   if (!res.ok) throw new Error(`GitHub ${res.status}`)
   return (await res.json()).id
 }
+
+// A4: historial de versiones del Gist
+export async function gistHistory(token, gistId) {
+  const res = await fetch(`https://api.github.com/gists/${gistId}`, { headers: headers(token) })
+  if (!res.ok) throw new Error(`GitHub ${res.status}`)
+  const gist = await res.json()
+  return (gist.history || [])
+    .map(h => ({ version: h.version, at: h.committed_at, changes: h.change_status }))
+    .slice(0, 15)
+}
+
+export async function gistAtVersion(token, gistId, sha) {
+  const res = await fetch(`https://api.github.com/gists/${gistId}/${sha}`, { headers: headers(token) })
+  if (!res.ok) throw new Error(`GitHub ${res.status}`)
+  const gist = await res.json()
+  const f = gist.files?.[FILE]
+  return f?.content ? JSON.parse(f.content) : null
+}

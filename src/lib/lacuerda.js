@@ -14,6 +14,7 @@ export function directUrl(artist, title) {
 }
 
 export function searchUrl(artist, title) {
-  const q = `${artist} ${title}`.trim().split(/\s+/).join('+')
-  return `https://acordes.lacuerda.net/busca.php?exp=${encodeURIComponent(q)}`
+  // Cada termino se encodea por separado; los '+' literales actuan como espacios
+  const q = `${artist} ${title}`.trim().split(/\s+/).map(encodeURIComponent).join('+')
+  return `https://acordes.lacuerda.net/busca.php?exp=${q}`
 }

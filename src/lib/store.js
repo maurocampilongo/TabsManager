@@ -10,11 +10,23 @@ export const emptyState = () => ({
 export function loadLocal() {
   try {
     const raw = localStorage.getItem(KEY)
-    return raw ? { ...emptyState(), ...JSON.parse(raw) } : emptyState()
+    const st = raw ? { ...emptyState(), ...JSON.parse(raw) } : emptyState()
+    // E1: si el usuario eligio no persistir el token, se recupera de sessionStorage
+    const sessionToken = sessionStorage.getItem('tabmanager_token')
+    if (sessionToken) st.settings.githubToken = sessionToken
+    return st
   } catch { return emptyState() }
 }
 
 export function saveLocal(state) {
+  // E1: token volatil -> solo en sessionStorage, nunca en localStorage
+  if (state.settings?.tokenVolatile && state.settings.githubToken) {
+    sessionStorage.setItem('tabmanager_token', state.settings.githubToken)
+    const { githubToken, ...rest } = state.settings
+    localStorage.setItem(KEY, JSON.stringify({ ...state, settings: { ...rest, tokenVolatile: true } }))
+    return
+  }
+  sessionStorage.removeItem('tabmanager_token')
   localStorage.setItem(KEY, JSON.stringify(state))
 }
 

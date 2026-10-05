@@ -42,10 +42,15 @@ export default function App() {
   const update = useCallback((fn) => setState(s => ({ ...s, ...fn(s), updatedAt: Date.now() })), [])
 
   const addSong = useCallback((song) => {
+    // B2: no duplicar si ya existe misma cancion+artista (case-insensitive)
+    const dup = stateRef.current.songs.find(x =>
+      x.title.toLowerCase() === song.title.toLowerCase() &&
+      x.artist.toLowerCase() === song.artist.toLowerCase())
+    if (dup) { toast(`Ya tenés "${song.title}" en tu biblioteca`, 'info'); return dup.id }
     const full = { id: uid(), notes: '', album: '', year: '', capo: '', tuning: '', art: '', url: directUrl(song.artist, song.title), ...song }
     update(s => ({ songs: [...s.songs, full] }))
     return full.id
-  }, [update])
+  }, [update, toast])
 
   const addToList = useCallback((listId, songId) => {
     update(s => ({
