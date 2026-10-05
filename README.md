@@ -18,3 +18,6 @@ npm run dev
 ## Deploy
 Push a `main` → GitHub Actions publica en `https://<usuario>.github.io/tabmanager`.
 Requiere habilitar GitHub Pages (Source: GitHub Actions) en Settings → Pages.
+
+### Nota sobre el workflow
+El archivo `deploy.yml.example` contiene el workflow de GitHub Actions. Para activar el despliegue automático, cópialo a `.github/workflows/deploy.yml` (por ejemplo desde la interfaz web de GitHub: Add file → upload) y habilita Pages con Source: **GitHub Actions**.
