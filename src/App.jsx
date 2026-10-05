@@ -50,7 +50,15 @@ export default function App() {
       const newId = await pushToGist(githubToken, id, { ...data, updatedAt: Date.now() })
       update(() => ({ ...data, updatedAt: Date.now(), settings: { ...state.settings, gistId: newId } }))
       setSyncMsg('Sincronizado ✓')
-    } catch (e) { setSyncMsg('Error: ' + e.message) }
+    } catch (e) {
+      // Si el gist guardado fue eliminado (404), olvidarlo y reintentar una vez
+      if (e.message.includes('404') && state.settings.gistId) {
+        update(st => ({ settings: { ...st.settings, gistId: '' } }))
+        setSyncing(false)
+        return setTimeout(syncNow, 100)
+      }
+      setSyncMsg('Error: ' + e.message)
+    }
     setSyncing(false)
   }
 
