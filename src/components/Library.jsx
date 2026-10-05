@@ -75,7 +75,8 @@ function SongForm({ song, onClose, onSave }) {
         {field('notes', 'Notas rápidas (opcional)', { placeholder: 'ej. capo 2, afinación drop D' })}
         <button onClick={() => {
           if (!f.title.trim() || !f.artist.trim()) return
-          onSave({ ...f, url: f.url && song ? f.url : directUrl(f.artist, f.title) })
+          // Regenerar siempre el slug: si se edito titulo/artista el link viejo quedaba roto
+          onSave({ ...f, url: directUrl(f.artist, f.title) })
         }} className="w-full rounded-xl bg-amber-500 text-slate-950 font-semibold py-3">Guardar</button>
       </div>
     </div>

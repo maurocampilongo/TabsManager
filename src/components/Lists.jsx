@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Sortable from 'sortablejs'
-import { Plus, Trash2, ExternalLink, GripVertical, ChevronLeft, Search, StickyNote } from 'lucide-react'
+import { Plus, Trash2, ExternalLink, GripVertical, ChevronLeft, StickyNote, Play } from 'lucide-react'
+import StageMode from './StageMode'
 import { uid } from '../lib/store'
 import { searchUrl } from '../lib/lacuerda'
 
@@ -36,6 +37,7 @@ export default function Lists({ state, update }) {
 function SetlistDetail({ list, state, update, onBack }) {
   const ref = useRef(null)
   const [pickMode, setPickMode] = useState(false)
+  const [stageMode, setStageMode] = useState(false)
 
   useEffect(() => {
     if (!ref.current || pickMode) return
@@ -68,6 +70,15 @@ function SetlistDetail({ list, state, update, onBack }) {
         <button onClick={() => { if (confirm('¿Eliminar esta lista?')) update(s => ({ lists: s.lists.filter(l => l.id !== list.id) })); onBack() }}
           className="p-1 text-slate-500 hover:text-red-400"><Trash2 size={18} /></button>
       </div>
+
+      {songs.length > 0 && (
+        <button onClick={() => setStageMode(true)}
+          className="w-full flex items-center justify-center gap-2 rounded-xl bg-amber-500 text-slate-950 py-2.5 text-sm font-bold">
+          <Play size={16} /> Modo escenario
+        </button>
+      )}
+
+      {stageMode && <StageMode list={list} songs={songs} onClose={() => setStageMode(false)} />}
 
       <button onClick={() => setPickMode(p => !p)} className="w-full flex items-center justify-center gap-2 rounded-xl border border-amber-500/60 text-amber-400 py-2.5 text-sm font-semibold">
         <Plus size={16} /> {pickMode ? 'Listo' : 'Agregar canciones'}

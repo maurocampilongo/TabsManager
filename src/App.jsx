@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { Guitar, ListMusic, Compass, Settings as SettingsIcon, RefreshCw } from 'lucide-react'
-import { loadLocal, saveLocal, uid } from './lib/store'
+import { loadLocal, saveLocal, uid, mergeStates } from './lib/store'
 import { pullFromGist, pushToGist, findExistingGist } from './lib/gist'
 import { directUrl } from './lib/lacuerda'
 import Library from './components/Library'
@@ -14,9 +14,15 @@ export default function App() {
   const [syncMsg, setSyncMsg] = useState('')
   const [syncing, setSyncing] = useState(false)
 
+  // Ref al estado actual para que syncNow no use closures viejas
+  const stateRef = useRef(state)
+  stateRef.current = state
+  const syncingRef = useRef(false)
+
   useEffect(() => { saveLocal(state) }, [state])
 
-  const update = useCallback((fn) => setState(s => ({ ...s, ...fn(s) })), [])
+  // Cada edicion local actualiza updatedAt (clave para el merge de sync)
+  const update = useCallback((fn) => setState(s => ({ ...s, ...fn(s), updatedAt: Date.now() })), [])
 
   const addSong = useCallback((song) => {
     const full = { id: uid(), notes: '', album: '', year: '', url: directUrl(song.artist, song.title), ...song }
@@ -31,36 +37,58 @@ export default function App() {
     }))
   }, [update])
 
-  const syncNow = async () => {
-    const { githubToken, gistId } = state.settings
-    if (!githubToken) { setSyncMsg('Configura tu token en Ajustes'); return }
-    setSyncing(true); setSyncMsg('')
+  const syncNow = useCallback(async ({ quiet = false } = {}) => {
+    if (syncingRef.current) return
+    const cur = stateRef.current
+    const { githubToken } = cur.settings
+    if (!githubToken) { if (!quiet) setSyncMsg('Configura tu token en Ajustes'); return }
+    syncingRef.current = true
+    setSyncing(true)
+    if (!quiet) setSyncMsg('')
     try {
       // Si no hay gistId guardado (dispositivo nuevo), buscar uno existente
-      let id = gistId
+      let id = cur.settings.gistId
       if (!id) {
         id = await findExistingGist(githubToken)
         if (id) update(st => ({ settings: { ...st.settings, gistId: id } }))
       }
       const remote = await pullFromGist(githubToken, id)
-      let data = { songs: state.songs, lists: state.lists }
-      if (remote?.updatedAt && remote.updatedAt > (state.updatedAt || 0)) {
-        data = { songs: remote.songs || [], lists: remote.lists || [] }
-      }
-      const newId = await pushToGist(githubToken, id, { ...data, updatedAt: Date.now() })
-      update(() => ({ ...data, updatedAt: Date.now(), settings: { ...state.settings, gistId: newId } }))
-      setSyncMsg('Sincronizado ✓')
+      // Merge por items: nunca se pierden datos de ningun dispositivo
+      const merged = remote
+        ? mergeStates(stateRef.current, remote)
+        : { songs: stateRef.current.songs, lists: stateRef.current.lists }
+      const now = Date.now()
+      const newId = await pushToGist(githubToken, id, { ...merged, updatedAt: now })
+      update(() => ({ ...merged, updatedAt: now, settings: { ...stateRef.current.settings, gistId: newId } }))
+      if (!quiet) setSyncMsg('Sincronizado ✓')
     } catch (e) {
       // Si el gist guardado fue eliminado (404), olvidarlo y reintentar una vez
-      if (e.message.includes('404') && state.settings.gistId) {
+      if (e.message.includes('404') && cur.settings.gistId) {
         update(st => ({ settings: { ...st.settings, gistId: '' } }))
-        setSyncing(false)
-        return setTimeout(syncNow, 100)
+        syncingRef.current = false; setSyncing(false)
+        return setTimeout(() => syncNow({ quiet }), 100)
       }
-      setSyncMsg('Error: ' + e.message)
+      if (!quiet) setSyncMsg('Error: ' + e.message)
     }
+    syncingRef.current = false
     setSyncing(false)
-  }
+  }, [update])
+
+  // Auto-sync: al abrir la app y al volver a la pestaña
+  useEffect(() => {
+    syncNow({ quiet: true })
+    const onVisible = () => { if (document.visibilityState === 'visible') syncNow({ quiet: true }) }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [syncNow])
+
+  // Auto-sync con debounce 30s despues de ediciones locales
+  const dataKey = `${state.songs.length}|${state.lists.length}|${state.updatedAt}`
+  useEffect(() => {
+    if (!state.settings.githubToken) return
+    const t = setTimeout(() => syncNow({ quiet: true }), 30000)
+    return () => clearTimeout(t)
+  }, [dataKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const tabs = [
     { id: 'lists', label: 'Setlists', icon: ListMusic },
@@ -75,7 +103,7 @@ export default function App() {
         <h1 className="text-lg font-bold flex items-center gap-2">
           <Guitar className="text-amber-500" size={22} /> TabManager
         </h1>
-        <button onClick={syncNow} className="flex items-center gap-1 text-xs text-slate-400 hover:text-amber-400">
+        <button onClick={() => syncNow()} className="flex items-center gap-1 text-xs text-slate-400 hover:text-amber-400">
           <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} /> {syncMsg || 'Sync'}
         </button>
       </header>
@@ -84,7 +112,7 @@ export default function App() {
         {tab === 'lists' && <Lists state={state} update={update} />}
         {tab === 'library' && <Library state={state} update={update} addSong={addSong} addToList={addToList} />}
         {tab === 'explore' && <Explore state={state} addSong={addSong} />}
-        {tab === 'settings' && <Settings state={state} update={update} syncNow={syncNow} syncMsg={syncMsg} />}
+        {tab === 'settings' && <Settings state={state} update={update} syncNow={() => syncNow()} syncMsg={syncMsg} />}
       </main>
 
       <nav className="fixed bottom-0 left-0 right-0 border-t border-slate-800 bg-slate-950/95 backdrop-blur">
