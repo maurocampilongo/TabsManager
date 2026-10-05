@@ -24,12 +24,34 @@ export default function Library({ state, update, addSong, addToList }) {
 
       {filtered.length === 0 && <p className="text-slate-500 text-sm text-center pt-8">Biblioteca vacía. Agrega canciones manualmente o desde Explorar.</p>}
 
-      {filtered.map(s => (
+      {!q && [...new Set(filtered.map(s => s.artist))].sort((a, b) => a.localeCompare(b, 'es')).map(artist => (
+        <div key={artist} className="pt-2">
+          <div className="text-xs font-bold text-slate-500 uppercase tracking-wide pb-1">{artist}</div>
+          <div className="space-y-3">
+            {filtered.filter(s => s.artist === artist).sort((a, b) => a.title.localeCompare(b.title, 'es')).map(renderSong)}
+          </div>
+        </div>
+      ))}
+
+      {q && filtered.map(renderSong)}
+      {renderDialogs()}
+    </div>
+  )
+
+  function renderSong(s) {
+    return (
         <div key={s.id} className="rounded-xl bg-slate-900 border border-slate-800 p-3">
           <div className="flex items-start gap-2">
+            {s.art && <img src={s.art} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0" loading="lazy" />}
             <div className="flex-1 min-w-0">
               <div className="font-medium truncate">{s.title}</div>
               <div className="text-xs text-slate-500">{s.artist}{s.album ? ` · ${s.album}` : ''}{s.year ? ` (${s.year})` : ''}</div>
+              {(s.capo || s.tuning) && (
+                <div className="flex gap-1.5 mt-1">
+                  {s.capo && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 font-semibold">Capo {s.capo}</span>}
+                  {s.tuning && <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-400 font-semibold">{s.tuning}</span>}
+                </div>
+              )}
               {s.notes && <div className="text-xs text-amber-500/80 mt-1">📝 {s.notes}</div>}
               <div className="text-[10px] text-slate-600 mt-1">En {state.lists.filter(l => l.songIds.includes(s.id)).map(l => l.name).join(', ') || 'ninguna lista'}</div>
             </div>
@@ -38,8 +60,10 @@ export default function Library({ state, update, addSong, addToList }) {
             <button onClick={() => setDeleting(s)} className="p-2 text-slate-600 hover:text-red-400"><Trash2 size={16} /></button>
           </div>
         </div>
-      ))}
+    )
+  }
 
+  function renderDialogs() { return (<>
       {deleting && <ConfirmDialog title="Eliminar canción"
         message={`Se eliminará "${deleting.title}" de la biblioteca y de todas las listas.`}
         onConfirm={() => {
@@ -58,12 +82,12 @@ export default function Library({ state, update, addSong, addToList }) {
           else update(st => ({ songs: st.songs.map(x => x.id === editing.id ? { ...x, ...data } : x) }))
           setEditing(null)
         }} />}
-    </div>
-  )
+  </>)
+  }
 }
 
 function SongForm({ song, onClose, onSave }) {
-  const [f, setF] = useState({ title: '', artist: '', album: '', year: '', notes: '', ...song })
+  const [f, setF] = useState({ title: '', artist: '', album: '', year: '', capo: '', tuning: '', notes: '', ...song })
   const set = (k, v) => setF(p => ({ ...p, [k]: v }))
   const field = (k, label, props = {}) => (
     <label className="block text-xs text-slate-400 space-y-1">
@@ -82,6 +106,7 @@ function SongForm({ song, onClose, onSave }) {
         {field('title', 'Título *')}
         {field('artist', 'Artista *')}
         <div className="grid grid-cols-2 gap-3">{field('album', 'Álbum')}{field('year', 'Año', { inputMode: 'numeric' })}</div>
+        <div className="grid grid-cols-2 gap-3">{field('capo', 'Capo', { placeholder: 'ej. 2' })}{field('tuning', 'Afinación', { placeholder: 'ej. Drop D, Eb' })}</div>
         {field('notes', 'Notas rápidas (opcional)', { placeholder: 'ej. capo 2, afinación drop D' })}
         <button onClick={() => {
           if (!f.title.trim() || !f.artist.trim()) return

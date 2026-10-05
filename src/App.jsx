@@ -42,7 +42,7 @@ export default function App() {
   const update = useCallback((fn) => setState(s => ({ ...s, ...fn(s), updatedAt: Date.now() })), [])
 
   const addSong = useCallback((song) => {
-    const full = { id: uid(), notes: '', album: '', year: '', url: directUrl(song.artist, song.title), ...song }
+    const full = { id: uid(), notes: '', album: '', year: '', capo: '', tuning: '', art: '', url: directUrl(song.artist, song.title), ...song }
     update(s => ({ songs: [...s.songs, full] }))
     return full.id
   }, [update])

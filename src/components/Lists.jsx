@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import Sortable from 'sortablejs'
-import { Plus, Trash2, ExternalLink, GripVertical, ChevronLeft, StickyNote, Play } from 'lucide-react'
+import { Plus, Trash2, ExternalLink, GripVertical, ChevronLeft, StickyNote, Play, Share2, Pencil } from 'lucide-react'
 import StageMode from './StageMode'
 import { ConfirmDialog, PromptDialog } from './ui'
 import { uid } from '../lib/store'
@@ -41,6 +41,29 @@ function SetlistDetail({ list, state, update, onBack }) {
   const [pickMode, setPickMode] = useState(false)
   const [stageMode, setStageMode] = useState(false)
   const [confirmDel, setConfirmDel] = useState(false)
+  const [noteFor, setNoteFor] = useState(null) // songId al que se le edita la nota de esta lista
+  const [shareMsg, setShareMsg] = useState(false)
+
+  // C2: compartir setlist como texto (WhatsApp, etc.)
+  const shareList = async () => {
+    const lines = songs.map((s, i) => `${i + 1}. ${s.title} - ${s.artist}`)
+    const text = `🎸 ${list.name}\n\n` + lines.join('\n')
+    if (navigator.share) {
+      try { await navigator.share({ title: list.name, text }); return } catch { /* cancelado */ }
+    }
+    await navigator.clipboard.writeText(text).catch(() => {})
+    setShareMsg(true); setTimeout(() => setShareMsg(false), 2000)
+  }
+
+  // C3: guardar nota especifica de la entrada en esta lista
+  const saveEntryNote = (songId, text) => {
+    setNoteFor(null)
+    update(st => ({
+      lists: st.lists.map(l => l.id === list.id
+        ? { ...l, notes: { ...(l.notes || {}), [songId]: text } }
+        : l),
+    }))
+  }
 
   useEffect(() => {
     if (!ref.current || pickMode) return
@@ -81,7 +104,17 @@ function SetlistDetail({ list, state, update, onBack }) {
         </button>
       )}
 
-      {stageMode && <StageMode list={list} songs={songs} onClose={() => setStageMode(false)} />}
+      {songs.length > 0 && (
+        <button onClick={shareList}
+          className="w-full flex items-center justify-center gap-2 rounded-xl border border-slate-700 text-slate-300 py-2.5 text-sm font-semibold">
+          <Share2 size={16} /> {shareMsg ? 'Copiada al portapapeles ✓' : 'Compartir setlist'}
+        </button>
+      )}
+
+      {stageMode && <StageMode list={list} songs={songs} entryNotes={list.notes || {}} onClose={() => setStageMode(false)} />}
+      {noteFor && <PromptDialog title={`Nota en "${list.name}"`} placeholder="ej. en esta fecha la tocamos en Bm"
+        initial={list.notes?.[noteFor] || ''} submitLabel="Guardar"
+        onSubmit={text => saveEntryNote(noteFor, text)} onCancel={() => setNoteFor(null)} />}
       {confirmDel && <ConfirmDialog title="Eliminar lista" message={`Se eliminará "${list.name}". Las canciones quedan en la biblioteca.`}
         onConfirm={() => { update(s => ({ lists: s.lists.filter(l => l.id !== list.id) })); onBack() }}
         onCancel={() => setConfirmDel(false)} />}
@@ -111,7 +144,11 @@ function SetlistDetail({ list, state, update, onBack }) {
                 <div className="font-medium truncate">{s.title}</div>
                 <div className="text-xs text-slate-500 truncate">{s.artist}{s.album ? ` · ${s.album} ${s.year || ''}` : ''}</div>
                 {s.notes && <div className="text-xs text-amber-500/80 flex items-center gap-1 mt-0.5"><StickyNote size={11} />{s.notes}</div>}
+                {list.notes?.[s.id] && <div className="text-xs text-sky-400/90 flex items-center gap-1 mt-0.5"><StickyNote size={11} />{list.notes[s.id]} <span className="text-slate-600">(esta lista)</span></div>}
               </div>
+              <button onClick={() => setNoteFor(s.id)} className="p-2 text-slate-600 hover:text-sky-400" title="Nota para esta lista">
+                <Pencil size={15} />
+              </button>
               <a href={s.url || searchUrl(s.artist, s.title)} target="_blank" rel="noreferrer"
                 className="p-2 text-amber-400 hover:text-amber-300" title="Ver acordes en LaCuerda.net">
                 <ExternalLink size={18} />

@@ -36,7 +36,7 @@ export function mergeStates(local, remote) {
     if (!prev) { listMap.set(l.id, l); continue }
     const ids = [...l.songIds]
     for (const id of prev.songIds) if (!ids.includes(id)) ids.push(id)
-    listMap.set(l.id, { ...prev, ...l, songIds: ids })
+    listMap.set(l.id, { ...prev, ...l, songIds: ids, notes: { ...(prev.notes || {}), ...(l.notes || {}) } })
   }
 
   return { songs: [...songMap.values()], lists: [...listMap.values()] }

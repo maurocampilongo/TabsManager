@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Search, ChevronLeft, Plus, Check, Music } from 'lucide-react'
-import { searchArtists, artistReleases, releaseTracks } from '../lib/discography'
+import { searchArtists, artistReleases, releaseTracks, itunesArtistAlbums } from '../lib/discography'
 
 export default function Explore({ state, addSong }) {
   const [q, setQ] = useState('')
@@ -22,7 +22,19 @@ export default function Explore({ state, addSong }) {
 
   const pickArtist = async (a) => {
     setArtist(a); setAlbums(null); setAlbum(null); setLoading(true)
-    try { setAlbums(await artistReleases(a.id)) } catch { setErr('Error cargando discografía') }
+    try {
+      const mbAlbums = await artistReleases(a.id)
+      setAlbums(mbAlbums)
+      // C6: caratulas de iTunes (respaldo, no bloquea)
+      try {
+        const itAlbums = await itunesArtistAlbums(a.name)
+        const norm = t => (t || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+        setAlbums(mbAlbums.map(al => ({
+          ...al,
+          art: itAlbums.find(x => norm(x.title) === norm(al.title))?.art || '',
+        })))
+      } catch { /* sin caratulas */ }
+    } catch { setErr('Error cargando discografía') }
     setLoading(false)
   }
 
@@ -33,8 +45,18 @@ export default function Explore({ state, addSong }) {
   }
 
   const add = (title) => {
-    addSong({ title, artist: artist.name, album: album.title, year: album.year })
+    addSong({ title, artist: artist.name, album: album.title, year: album.year, art: album.art || '' })
     setAdded(p => new Set(p).add(`${album.id}|${title}`))
+  }
+
+  // C5: agregar todos los temas del album de una vez
+  const addAll = () => {
+    for (const t of tracks || []) {
+      if (!added.has(`${album.id}|${t}`) && !state.songs.some(s => s.title === t && s.artist === artist.name)) {
+        addSong({ title: t, artist: artist.name, album: album.title, year: album.year, art: album.art || '' })
+      }
+    }
+    setAdded(p => new Set([...p, ...(tracks || []).map(t => `${album.id}|${t}`)]))
   }
 
   return (
@@ -75,7 +97,9 @@ export default function Explore({ state, addSong }) {
           {(albums || []).map(al => (
             <button key={al.id} onClick={() => pickAlbum(al)}
               className="w-full text-left rounded-xl bg-slate-900 border border-slate-800 p-3 flex items-center gap-3 hover:border-amber-500/50">
-              <Music size={18} className="text-slate-600 shrink-0" />
+              {al.art
+                ? <img src={al.art} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0" loading="lazy" />
+                : <Music size={18} className="text-slate-600 shrink-0" />}
               <div><div className="font-medium">{al.title}</div>{al.year && <div className="text-xs text-slate-500">{al.year}</div>}</div>
             </button>
           ))}
@@ -88,6 +112,12 @@ export default function Explore({ state, addSong }) {
             <button onClick={() => setAlbum(null)} className="p-1 text-slate-400"><ChevronLeft size={22} /></button>
             <h2 className="font-bold truncate">{album.title} <span className="text-slate-500 font-normal text-sm">{album.year}</span></h2>
           </div>
+          {(tracks || []).length > 0 && (
+            <button onClick={addAll}
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-amber-500 text-slate-950 py-2.5 text-sm font-bold">
+              <Plus size={16} /> Agregar álbum completo
+            </button>
+          )}
           {loading && <p className="text-slate-500 text-sm">Cargando temas...</p>}
           {(tracks || []).map(t => {
             const isAdded = added.has(`${album.id}|${t}`) || state.songs.some(s => s.title === t && s.artist === artist.name)

@@ -4,7 +4,7 @@ import { searchUrl } from '../lib/lacuerda'
 
 // Modo escenario: vista full-screen para tocar en vivo.
 // Texto grande, navegacion simple, pantalla siempre encendida (Wake Lock).
-export default function StageMode({ list, songs, onClose }) {
+export default function StageMode({ list, songs, entryNotes = {}, onClose }) {
   const [current, setCurrent] = useState(0)
   const wakeLock = useRef(null)
 
@@ -44,7 +44,14 @@ export default function StageMode({ list, songs, onClose }) {
           <>
             <h2 className="text-3xl sm:text-4xl font-bold leading-tight">{song.title}</h2>
             <div className="text-xl text-slate-400">{song.artist}</div>
+            {(song.capo || song.tuning) && (
+              <div className="flex gap-2 justify-center">
+                {song.capo && <span className="text-sm px-3 py-1 rounded-full bg-amber-500/15 text-amber-400 font-bold">Capo {song.capo}</span>}
+                {song.tuning && <span className="text-sm px-3 py-1 rounded-full bg-violet-500/15 text-violet-400 font-bold">{song.tuning}</span>}
+              </div>
+            )}
             {song.notes && <div className="text-amber-400 text-lg">📝 {song.notes}</div>}
+            {entryNotes[song.id] && <div className="text-sky-400 text-lg">📝 {entryNotes[song.id]}</div>}
             <a href={song.url || searchUrl(song.artist, song.title)} target="_blank" rel="noreferrer"
               className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-amber-500 text-slate-950 font-bold px-8 py-4 text-lg">
               <ExternalLink size={22} /> Ver acordes
