@@ -51,10 +51,14 @@ export default function Explore({ state, addSong }) {
             <button onClick={doSearch} className="rounded-xl bg-amber-500 text-slate-950 px-4 text-sm font-semibold">Buscar</button>
           </div>
           <p className="text-[11px] text-slate-600">Fuente: MusicBrainz API (discografías completas del rock argentino)</p>
+          {loading && <p className="text-slate-500 text-sm">Buscando (priorizando artistas argentinos)...</p>}
           {artists.map(a => (
             <button key={a.id} onClick={() => pickArtist(a)}
               className="w-full text-left rounded-xl bg-slate-900 border border-slate-800 p-3 hover:border-amber-500/50">
-              <div className="font-medium">{a.name}</div>
+              <div className="font-medium flex items-center gap-2">
+                {a.name}
+                {a.isAR && <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-400 font-semibold">AR</span>}
+              </div>
               {a.detail && <div className="text-xs text-slate-500">{a.detail}</div>}
             </button>
           ))}

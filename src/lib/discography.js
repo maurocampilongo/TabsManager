@@ -1,14 +1,25 @@
 // Busqueda de artistas/discografia: MusicBrainz (principal) + iTunes (respaldo)
 export async function searchArtists(query) {
-  const url = `https://musicbrainz.org/ws/2/artist/?query=${encodeURIComponent(query)}&fmt=json&limit=12`
-  const res = await fetch(url, { headers: { 'User-Agent': 'TabManager/1.0 ( tabmanager app )' } })
-  if (!res.ok) throw new Error('MusicBrainz error')
-  const data = await res.json()
-  return (data.artists || []).map(a => ({
+  const mb = { headers: { 'User-Agent': 'TabManager/1.0 ( tabmanager app )' } }
+  const map = a => ({
     id: a.id,
     name: a.name,
-    detail: [a.country, a['life-span']?.begin?.slice(0, 4)].filter(Boolean).join(' · '),
-  }))
+    isAR: a.country === 'AR',
+    detail: [a.disambiguation || null, a.country, a['life-span']?.begin?.slice(0, 4)]
+      .filter(Boolean).join(' · '),
+  })
+  const fetchQ = async (q) => {
+    const res = await fetch(`https://musicbrainz.org/ws/2/artist/?query=${encodeURIComponent(q)}&fmt=json&limit=12`, mb)
+    if (!res.ok) throw new Error('MusicBrainz error')
+    return ((await res.json()).artists || []).map(map)
+  }
+  // 1) Artistas argentinos primero
+  const ar = await fetchQ(`${query} AND country:AR`)
+  // 2) Completar con resultados globales (rate limit MusicBrainz: 1 req/s)
+  await new Promise(r => setTimeout(r, 1100))
+  const global = await fetchQ(query)
+  const seen = new Set(ar.map(a => a.id))
+  return [...ar, ...global.filter(a => !seen.has(a.id))].slice(0, 15)
 }
 
 export async function artistReleases(artistId) {
