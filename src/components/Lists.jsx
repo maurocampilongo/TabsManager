@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import Sortable from 'sortablejs'
 import { Plus, Trash2, ExternalLink, GripVertical, ChevronLeft, StickyNote, Play } from 'lucide-react'
 import StageMode from './StageMode'
+import { ConfirmDialog, PromptDialog } from './ui'
 import { uid } from '../lib/store'
 import { searchUrl } from '../lib/lacuerda'
 
@@ -11,15 +12,15 @@ export default function Lists({ state, update }) {
 
   if (active) return <SetlistDetail list={active} state={state} update={update} onBack={() => setActiveId(null)} />
 
-  const createList = () => {
-    const name = prompt('Nombre de la lista (ej. Repertorio Rock, Ensayos, Acústico)')
-    if (!name?.trim()) return
-    update(s => ({ lists: [...s.lists, { id: uid(), name: name.trim(), songIds: [] }] }))
+  const [promptNew, setPromptNew] = useState(false)
+  const createList = (name) => {
+    setPromptNew(false)
+    update(s => ({ lists: [...s.lists, { id: uid(), name, songIds: [] }] }))
   }
 
   return (
     <div className="p-4 space-y-3">
-      <button onClick={createList} className="w-full flex items-center justify-center gap-2 rounded-xl bg-amber-500 text-slate-950 font-semibold py-3">
+      <button onClick={() => setPromptNew(true)} className="w-full flex items-center justify-center gap-2 rounded-xl bg-amber-500 text-slate-950 font-semibold py-3">
         <Plus size={18} /> Nueva lista
       </button>
       {state.lists.length === 0 && <p className="text-slate-500 text-sm text-center pt-8">Crea tu primera setlist para empezar.</p>}
@@ -30,6 +31,7 @@ export default function Lists({ state, update }) {
           <div className="text-xs text-slate-500">{l.songIds.length} canciones</div>
         </button>
       ))}
+      {promptNew && <PromptDialog title="Nueva lista" placeholder="Repertorio Rock, Ensayos, Acústico..." onSubmit={createList} onCancel={() => setPromptNew(false)} />}
     </div>
   )
 }
@@ -38,6 +40,7 @@ function SetlistDetail({ list, state, update, onBack }) {
   const ref = useRef(null)
   const [pickMode, setPickMode] = useState(false)
   const [stageMode, setStageMode] = useState(false)
+  const [confirmDel, setConfirmDel] = useState(false)
 
   useEffect(() => {
     if (!ref.current || pickMode) return
@@ -67,7 +70,7 @@ function SetlistDetail({ list, state, update, onBack }) {
       <div className="flex items-center gap-2">
         <button onClick={onBack} className="p-1 text-slate-400"><ChevronLeft size={22} /></button>
         <h2 className="flex-1 font-bold truncate">{list.name}</h2>
-        <button onClick={() => { if (confirm('¿Eliminar esta lista?')) update(s => ({ lists: s.lists.filter(l => l.id !== list.id) })); onBack() }}
+        <button onClick={() => setConfirmDel(true)}
           className="p-1 text-slate-500 hover:text-red-400"><Trash2 size={18} /></button>
       </div>
 
@@ -79,6 +82,9 @@ function SetlistDetail({ list, state, update, onBack }) {
       )}
 
       {stageMode && <StageMode list={list} songs={songs} onClose={() => setStageMode(false)} />}
+      {confirmDel && <ConfirmDialog title="Eliminar lista" message={`Se eliminará "${list.name}". Las canciones quedan en la biblioteca.`}
+        onConfirm={() => { update(s => ({ lists: s.lists.filter(l => l.id !== list.id) })); onBack() }}
+        onCancel={() => setConfirmDel(false)} />}
 
       <button onClick={() => setPickMode(p => !p)} className="w-full flex items-center justify-center gap-2 rounded-xl border border-amber-500/60 text-amber-400 py-2.5 text-sm font-semibold">
         <Plus size={16} /> {pickMode ? 'Listo' : 'Agregar canciones'}

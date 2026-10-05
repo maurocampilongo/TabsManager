@@ -18,6 +18,12 @@ export default function Settings({ state, update, syncNow, syncMsg }) {
       </button>
       {syncMsg && <p className="text-sm text-slate-400">{syncMsg}</p>}
 
+      <h2 className="font-bold pt-4">Instalar como app</h2>
+      <p className="text-xs text-slate-500 leading-relaxed">
+        <strong className="text-slate-400">Android/Chrome:</strong> botón "Instalar" en la barra superior o menú → "Agregar a pantalla de inicio".<br />
+        <strong className="text-slate-400">iPhone/Safari:</strong> botón Compartir → "Add to Home Screen".
+      </p>
+
       <h2 className="font-bold pt-4">Datos</h2>
       <button onClick={() => {
         const blob = new Blob([JSON.stringify({ songs: state.songs, lists: state.lists }, null, 2)], { type: 'application/json' })

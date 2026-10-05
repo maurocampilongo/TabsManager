@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { Guitar, ListMusic, Compass, Settings as SettingsIcon, RefreshCw } from 'lucide-react'
+import { Guitar, ListMusic, Compass, Settings as SettingsIcon, RefreshCw, Download } from 'lucide-react'
+import { useToasts, Toasts, timeAgo } from './components/ui'
 import { loadLocal, saveLocal, uid, mergeStates } from './lib/store'
 import { pullFromGist, pushToGist, findExistingGist } from './lib/gist'
 import { directUrl } from './lib/lacuerda'
@@ -13,6 +14,22 @@ export default function App() {
   const [tab, setTab] = useState('lists')
   const [syncMsg, setSyncMsg] = useState('')
   const [syncing, setSyncing] = useState(false)
+  const { toasts, push: toast } = useToasts()
+  const [deferredInstall, setDeferredInstall] = useState(null)
+  const [, forceTick] = useState(0) // re-render para tiempo relativo
+
+  // D2: capturar evento de instalacion PWA
+  useEffect(() => {
+    const handler = (e) => { e.preventDefault(); setDeferredInstall(() => e) }
+    window.addEventListener('beforeinstallprompt', handler)
+    return () => window.removeEventListener('beforeinstallprompt', handler)
+  }, [])
+
+  // refrescar el "hace X min" cada 60s
+  useEffect(() => {
+    const t = setInterval(() => forceTick(n => n + 1), 60000)
+    return () => clearInterval(t)
+  }, [])
 
   // Ref al estado actual para que syncNow no use closures viejas
   const stateRef = useRef(state)
@@ -59,8 +76,9 @@ export default function App() {
         : { songs: stateRef.current.songs, lists: stateRef.current.lists }
       const now = Date.now()
       const newId = await pushToGist(githubToken, id, { ...merged, updatedAt: now })
-      update(() => ({ ...merged, updatedAt: now, settings: { ...stateRef.current.settings, gistId: newId } }))
-      if (!quiet) setSyncMsg('Sincronizado ✓')
+      update(() => ({ ...merged, updatedAt: now, lastSyncAt: now, settings: { ...stateRef.current.settings, gistId: newId } }))
+      setSyncMsg('')
+      toast('Sincronizado con GitHub ✓', 'success')
     } catch (e) {
       // Si el gist guardado fue eliminado (404), olvidarlo y reintentar una vez
       if (e.message.includes('404') && cur.settings.gistId) {
@@ -68,7 +86,8 @@ export default function App() {
         syncingRef.current = false; setSyncing(false)
         return setTimeout(() => syncNow({ quiet }), 100)
       }
-      if (!quiet) setSyncMsg('Error: ' + e.message)
+      setSyncMsg('Error')
+      toast('Error de sync: ' + e.message, 'error')
     }
     syncingRef.current = false
     setSyncing(false)
@@ -103,9 +122,23 @@ export default function App() {
         <h1 className="text-lg font-bold flex items-center gap-2">
           <Guitar className="text-amber-500" size={22} /> TabManager
         </h1>
-        <button onClick={() => syncNow()} className="flex items-center gap-1 text-xs text-slate-400 hover:text-amber-400">
-          <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} /> {syncMsg || 'Sync'}
-        </button>
+        <div className="flex items-center gap-3">
+          {deferredInstall && (
+            <button onClick={async () => { deferredInstall.prompt(); await deferredInstall.userChoice; setDeferredInstall(null) }}
+              className="flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300" title="Instalar app">
+              <Download size={14} /> Instalar
+            </button>
+          )}
+          <button onClick={() => syncNow()} className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-amber-400">
+            <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} />
+            {state.settings.githubToken ? (
+              <span className="flex items-center gap-1.5">
+                <span className={`w-2 h-2 rounded-full ${syncing ? 'bg-sky-400' : (state.lastSyncAt || 0) >= (state.updatedAt || 0) ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                {syncing ? 'Sincronizando' : syncMsg || timeAgo(state.lastSyncAt)}
+              </span>
+            ) : 'Sync'}
+          </button>
+        </div>
       </header>
 
       <main className="flex-1 overflow-y-auto pb-20">
@@ -125,6 +158,7 @@ export default function App() {
           ))}
         </div>
       </nav>
+      <Toasts toasts={toasts} />
     </div>
   )
 }

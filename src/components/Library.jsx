@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { Plus, Trash2, ExternalLink, Search, Pencil, X } from 'lucide-react'
 import { directUrl, searchUrl } from '../lib/lacuerda'
+import { ConfirmDialog } from './ui'
 
 export default function Library({ state, update, addSong, addToList }) {
   const [q, setQ] = useState('')
   const [editing, setEditing] = useState(null) // song | null | 'new'
+  const [deleting, setDeleting] = useState(null) // song a eliminar
 
   const filtered = state.songs.filter(s =>
     `${s.title} ${s.artist} ${s.album}`.toLowerCase().includes(q.toLowerCase()))
@@ -33,13 +35,21 @@ export default function Library({ state, update, addSong, addToList }) {
             </div>
             <a href={s.url || searchUrl(s.artist, s.title)} target="_blank" rel="noreferrer" className="p-2 text-amber-400"><ExternalLink size={18} /></a>
             <button onClick={() => setEditing(s)} className="p-2 text-slate-500"><Pencil size={16} /></button>
-            <button onClick={() => confirm('¿Eliminar de la biblioteca y de todas las listas?') && update(st => ({
-              songs: st.songs.filter(x => x.id !== s.id),
-              lists: st.lists.map(l => ({ ...l, songIds: l.songIds.filter(id => id !== s.id) })),
-            }))} className="p-2 text-slate-600 hover:text-red-400"><Trash2 size={16} /></button>
+            <button onClick={() => setDeleting(s)} className="p-2 text-slate-600 hover:text-red-400"><Trash2 size={16} /></button>
           </div>
         </div>
       ))}
+
+      {deleting && <ConfirmDialog title="Eliminar canción"
+        message={`Se eliminará "${deleting.title}" de la biblioteca y de todas las listas.`}
+        onConfirm={() => {
+          update(st => ({
+            songs: st.songs.filter(x => x.id !== deleting.id),
+            lists: st.lists.map(l => ({ ...l, songIds: l.songIds.filter(id => id !== deleting.id) })),
+          }))
+          setDeleting(null)
+        }}
+        onCancel={() => setDeleting(null)} />}
 
       {editing && <SongForm song={editing === 'new' ? null : editing}
         onClose={() => setEditing(null)}
