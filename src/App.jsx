@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { Guitar, ListMusic, Compass, Settings as SettingsIcon, RefreshCw } from 'lucide-react'
 import { loadLocal, saveLocal, uid } from './lib/store'
-import { pullFromGist, pushToGist } from './lib/gist'
+import { pullFromGist, pushToGist, findExistingGist } from './lib/gist'
 import { directUrl } from './lib/lacuerda'
 import Library from './components/Library'
 import Lists from './components/Lists'
@@ -36,12 +36,18 @@ export default function App() {
     if (!githubToken) { setSyncMsg('Configura tu token en Ajustes'); return }
     setSyncing(true); setSyncMsg('')
     try {
-      const remote = await pullFromGist(githubToken, gistId)
+      // Si no hay gistId guardado (dispositivo nuevo), buscar uno existente
+      let id = gistId
+      if (!id) {
+        id = await findExistingGist(githubToken)
+        if (id) update(st => ({ settings: { ...st.settings, gistId: id } }))
+      }
+      const remote = await pullFromGist(githubToken, id)
       let data = { songs: state.songs, lists: state.lists }
       if (remote?.updatedAt && remote.updatedAt > (state.updatedAt || 0)) {
         data = { songs: remote.songs || [], lists: remote.lists || [] }
       }
-      const newId = await pushToGist(githubToken, gistId, { ...data, updatedAt: Date.now() })
+      const newId = await pushToGist(githubToken, id, { ...data, updatedAt: Date.now() })
       update(() => ({ ...data, updatedAt: Date.now(), settings: { ...state.settings, gistId: newId } }))
       setSyncMsg('Sincronizado ✓')
     } catch (e) { setSyncMsg('Error: ' + e.message) }

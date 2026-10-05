@@ -17,6 +17,16 @@ export async function pullFromGist(token, gistId) {
   return JSON.parse(f.content)
 }
 
+// Busca un gist existente que contenga tabmanager_data.json (para reutilizarlo
+// en otros dispositivos en lugar de crear duplicados)
+export async function findExistingGist(token) {
+  const res = await fetch('https://api.github.com/gists?per_page=100', { headers: headers(token) })
+  if (!res.ok) throw new Error(`GitHub ${res.status}`)
+  const gists = await res.json()
+  const found = gists.find(g => g.files && g.files[FILE])
+  return found?.id || null
+}
+
 export async function pushToGist(token, gistId, data) {
   if (!token) throw new Error('Falta token')
   const body = JSON.stringify({ files: { [FILE]: { content: JSON.stringify(data, null, 2) } } })
